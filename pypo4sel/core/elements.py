@@ -70,7 +70,6 @@ class PageElement(common.BasePageElement, common.PageElementsContainer, common.F
             raise NoSuchElementException("Element with selector {} was not found".format(self._locator))
         self._id = we.id
         self._parent = we.parent
-        self._w3c = getattr(we, "_w3c", False)
         self.__cache[self._owner] = self._id
 
     def exists(self):
@@ -229,9 +228,8 @@ class PageElementsList(common.BasePageElement, collections.Sequence):
             self.__items.extend([self._el_class(self, i) for i in range(old_len, new_len)])
         else:
             del self.__items[new_len:]
-        w3c = getattr(self._parent, "w3c", False)
         for e, l in zip(self.__items, items):
-            setattr(e, "_id", l[0]), setattr(e, "_parent", l[1]), setattr(e, "_w3c", w3c)
+            setattr(e, "_id", l[0]), setattr(e, "_parent", l[1]), setattr(e, "_w3c", self._w3c)
 
     def _fill_owner(self, owner):
         super(PageElementsList, self)._fill_owner(owner)

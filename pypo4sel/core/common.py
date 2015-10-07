@@ -67,6 +67,7 @@ class BasePageElement(object):
                                 "PageElement or has 'driver' attribute.".format(type(owner).__name__))
             self._parent = owner.driver
             self._owner = owner.driver
+        self._w3c = getattr(self._parent, "w3c", False)
 
     # noinspection PyUnusedLocal
     def __get__(self, owner, cls):

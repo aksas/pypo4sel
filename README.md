@@ -49,14 +49,12 @@ and a little bit not 'classic'
     block.click()  # raise NoSuchElementException
 ```
 
-for page elements the behaviour is the same 
+for page element the behaviour is the same 
 ```python
     assert not page.not_existing_element.exists()  # pass
     assert not page.not_existing_element.is_displayed()  # pass
     page.not_existing_element.click()  # raise NoSuchElementException
 ```
-
-
 
 
 Work with list of elements is simple
@@ -91,7 +89,8 @@ but powerful
 
 
 
-And about waiting
+And a few words about 
+### waiting
 ```python
     class MyPage(PageElementsContainer):
         element = PageElement('selector', timeout=11)
@@ -144,3 +143,100 @@ so
 * flexible management of timeouts: common and individual implicit timeouts, easy combined with explicit
 
 and something else...
+
+### logging
+the following *native* actions log himself automatically:
+  * send_keys(self, *value)
+  * submit(self)
+  * click(self)
+  * clear(self)
+    
+to subscribe to logging actions create class inherits pypo4sel.core.log2l.ListenerMixin, implement appropriate evenets and add it to the list of listeners:
+```python    
+import pypo4sel.core.log2l as log
+
+class MyLogger(log.ListenerMixin):
+    def start_step(self, step_id, **options):
+        # step_id is uuid4
+        # options with which a step is started
+        do_some_logging_stuff_here
+
+    def end_step(self, step_id):
+        do_some_actions_to_close_log_section_if_needed
+
+    def exception(self, step_id, exc_type, exc_val, exc_tb):
+        log_exeption_here #  exception will be reraised automaticaly
+
+    def message(self, msg, **kwargs):
+        pass 
+        
+log.listeners.add(MyLogger())
+```
+
+After that, each time when an *action* will be called the 'start_step' will be called with the following 'options':
+``` 
+ {
+    'element_name':'name_of_element_or_selector',
+    'step_name':'action name',
+ }
+```
+
+and for `send_keys`
+```
+ {
+    'element_name': 'name_of_element_or_selector',
+    'step_name': 'send_keys',
+    'args': value
+ }
+```
+
+also any custom method may be wrapped as an step
+```python
+
+class Element(PageElement):
+    @log.step
+    def method(self, *fargs, **fkwargs):
+        do_smth_here
+
+    @log.step("any text")
+    def another_method(self, *fargs, **fkwargs):
+        self.click()
+
+        
+class Page(object):
+    my_element = Element('#id')
+```
+
+each time when 'method' will be called the 'start_step' will be called with the following 'options':
+```
+ {
+    'element_name':'my_element',
+    'step_name':'method',
+    'args':<fargs>,
+    'kwargs':<fkwargs>
+ }
+```
+for 'another_method' will be called the 'start_step' with:
+```
+ {
+    'first_param':'any text'
+    'element_name':'my_element',
+    'step_name':'another_method',
+    'args':<fargs>,
+    'kwargs':<fkwargs>
+ }
+```
+and *nested* action 'click'
+```
+ {
+    'element_name':'my_element',
+    'step_name':'click',
+ }
+```
+
+and `step` may be used as context
+```python
+with log.step('group of actions or smth like this'):
+    action1()
+    ....
+```

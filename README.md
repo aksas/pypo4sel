@@ -87,6 +87,39 @@ but powerful
         e.action()
 ```
 
+### *"one string"* selectors
+Do you notice it above?
+It mapped to *"classic"* selectors by the following rules:
+
+| one string | classic |
+| --- | --- |
+| #valid_id | (By.ID, valid_id) |
+| .valid_class_name | (By.CLASS_NAME, valid_class_name) |
+| valid_tag_name | (By.TAG_NAME, valid_tag_name) |
+| ./xpath | (By.XPATH, ./xpath) |
+| //xpath | (By.XPATH, //xpath) |
+| $x:xpath | (By.XPATH, xpath) |
+| @valid_value_of_name_attribute | (By.NAME, valid_value_of_name_attribute) |
+| $link_text:text | (By.LINK_TEXT, text) |
+| $partial_link_text:text | (By.PARTIAL_LINK_TEXT, text) |
+| anything else | (By.CSS_SELECTOR, anything else) |
+
+so you can use any of in any combination
+```python
+driver.find_element("#block_id")
+driver.find_element(By.ID, "block_id")
+driver.find_element("#block_id", PageElementClass)
+driver.find_element(By.ID, "block_id", PageElementClass)
+```
+
+in the same way use it for find_elements and for child_element(s).
+
+For page object initialization it is preferable to use *"one string"* selector,
+but if you want to use *"classic"* selectors - you are wellcome, just wrap it in tuple
+```python
+    class PageObject(PageElement):
+        field = PageElement((By.ID, "field_id"))
+```
 
 
 And a few words about 
@@ -234,7 +267,7 @@ and *nested* action 'click'
  }
 ```
 
-and `step` may be used as context
+Also `step` may be used as context
 ```python
 with log.step('group of actions or smth like this'):
     action1()

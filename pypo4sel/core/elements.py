@@ -1,7 +1,8 @@
 import hashlib
+import socket
 import time
 import uuid
-import collections
+import errno
 
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
@@ -134,17 +135,22 @@ class PageElement(common.BasePageElement, common.PageElementsContainer, common.F
         if not self.__cached__ or self._id is None:
             self.reload()
 
-        stale_reference_occurrence = 0
+        execute_attempts = 0
         while True:
             try:
                 val = super(PageElement, self)._execute(command, params)
                 return val
             except StaleElementReferenceException:
-                if stale_reference_occurrence > common.WAIT_STALE_ELEMENT_MAX_TRY:
+                if execute_attempts > common.WAIT_STALE_ELEMENT_MAX_TRY:
                     raise
                 time.sleep(common.WAIT_ELEMENT_POLL_FREQUENCY)
                 self.reload()
-                stale_reference_occurrence += 1
+            except socket.error as err:
+                if err.errno == errno.ECONNREFUSED and hasattr(self._owner, 'reload'):
+                        self._owner.reload()
+                else:
+                    raise
+            execute_attempts += 1
         return None
 
     def __hash__(self):
@@ -181,7 +187,7 @@ class _ListItem(object):
 
 
 # noinspection PyAbstractClass
-class PageElementsList(common.BasePageElement, collections.Sequence):
+class PageElementsList(common.BasePageElement):
     """
     Provide list interface for list of page elements.
     The list encapsulate logic of changing of context of elements usage and hold context of element usage.
@@ -244,6 +250,16 @@ class PageElementsList(common.BasePageElement, collections.Sequence):
         if not self.__cached__ or self._owner not in self.__cache:
             self.reload()
         return self.__items[index]
+
+    def __iter__(self):
+        self.reload()
+        i = 0
+        while True:
+            try:
+                yield self[i]
+                i += 1
+            except IndexError:
+                return
 
     def is_displayed(self):
         """

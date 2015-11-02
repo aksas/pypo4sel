@@ -115,7 +115,7 @@ driver.find_element(By.ID, "block_id", PageElementClass)
 in the same way use it for find_elements and for child_element(s).
 
 For page object initialization it is preferable to use *"one string"* selector,
-but if you want to use *"classic"* selectors - you are wellcome, just wrap it in tuple
+but if you want to use *"classic"* selectors - you are welcome, just wrap it in tuple
 ```python
     class PageObject(PageElement):
         field = PageElement((By.ID, "field_id"))
@@ -178,13 +178,13 @@ so
 and something else...
 
 ### logging
-the following *native* actions log himself automatically:
+the following *native* actions log itself automatically:
   * send_keys(self, *value)
   * submit(self)
   * click(self)
   * clear(self)
     
-to subscribe to logging actions create class inherits pypo4sel.core.log2l.ListenerMixin, implement appropriate evenets and add it to the list of listeners:
+to subscribe to logging actions create class inherits pypo4sel.core.log2l.ListenerMixin, implement appropriate events and add it to the list of listeners:
 ```python    
 import pypo4sel.core.log2l as log
 
@@ -198,7 +198,7 @@ class MyLogger(log.ListenerMixin):
         do_some_actions_to_close_log_section_if_needed
 
     def exception(self, step_id, exc_type, exc_val, exc_tb):
-        log_exeption_here #  exception will be reraised automaticaly
+        log_exception_here #  exception will be reraised automatically
 
     def message(self, msg, **kwargs):
         pass 
@@ -223,7 +223,7 @@ and for `send_keys`
  }
 ```
 
-also any custom method may be wrapped as an step
+also any custom method may be wrapped as a step
 ```python
 
 class Element(PageElement):
@@ -245,8 +245,8 @@ each time when 'method' will be called the 'start_step' will be called with the 
  {
     'element_name':'my_element',
     'step_name':'method',
-    'args':<fargs>,
-    'kwargs':<fkwargs>
+    'args': fargs,
+    'kwargs': fkwargs
  }
 ```
 for 'another_method' will be called the 'start_step' with:
@@ -255,8 +255,8 @@ for 'another_method' will be called the 'start_step' with:
     'first_param':'any text'
     'element_name':'my_element',
     'step_name':'another_method',
-    'args':<fargs>,
-    'kwargs':<fkwargs>
+    'args': fargs,
+    'kwargs': fkwargs
  }
 ```
 and *nested* action 'click'
@@ -273,3 +273,26 @@ with log.step('group of actions or smth like this'):
     action1()
     ....
 ```
+options for 'start_step'
+```
+ {
+    'first_param':'group of actions or smth like this'
+ }
+```
+
+
+### Examples
+
+`wait_not_displayed` returns True if element is not displayed, so 
+
+```
+dialog.close_button.click()
+wait_not_displayed(dialog, 5)
+assert not dialog.is_displayed(), "the dialog is not closed in 5 sec"
+```
+equals
+```
+dialog.close_button.click()
+assert wait_not_displayed(dialog, 5), "the dialog is not closed in 5 sec"
+```
+

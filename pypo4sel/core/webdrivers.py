@@ -38,7 +38,7 @@ class WebDriverBase(common.FindOverride):
 
     def __hash__(self):
         # noinspection PyUnresolvedReferences
-        return int(hashlib.md5(self.session_id.encode('utf-8')).hexdigest(), 16)
+        return int(hashlib.md5(self.session_id).hexdigest(), 16)
 
     def __eq__(self, other):
         # noinspection PyUnresolvedReferences

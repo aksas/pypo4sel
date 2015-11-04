@@ -145,16 +145,11 @@ class PageElement(common.BasePageElement, common.PageElementsContainer, common.F
                     raise
                 time.sleep(common.WAIT_ELEMENT_POLL_FREQUENCY)
                 self.reload()
-            except socket.error as err:
-                if err.errno == errno.ECONNREFUSED and hasattr(self._owner, 'reload'):
-                        self._owner.reload()
-                else:
-                    raise
             execute_attempts += 1
         return None
 
     def __hash__(self):
-        return int(hashlib.md5(self.id.encode('utf-8')).hexdigest(), 16)
+        return int(hashlib.md5(self.id+'-'+self._parent.session_id).hexdigest(), 16)
 
 
 class _ListItem(object):

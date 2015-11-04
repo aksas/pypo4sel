@@ -1,6 +1,5 @@
 from abc import abstractmethod
 import inspect
-from operator import add
 import re
 
 from selenium.common.exceptions import InvalidSelectorException, NoSuchElementException
@@ -15,7 +14,7 @@ WAIT_ELEMENT_POLL_FREQUENCY = 0.5
 def get_members_safety(cls):
     # inspect.getmembers calls __get__ method of the field, if exists, that may cause unexpected actions
     # the solution below does't have this problem
-    return reduce(add, [vars(c).items() for c in inspect.getmro(cls)])
+    return reduce(lambda a, b: dict(a, **vars(b)), reversed(inspect.getmro(cls)), {}).items()
 
 
 class PageElementsContainer(object):

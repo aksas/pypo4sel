@@ -1,8 +1,6 @@
 import hashlib
-import socket
 import time
 import uuid
-import errno
 
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
@@ -218,7 +216,7 @@ class PageElementsList(common.BasePageElement):
         # noinspection PyUnresolvedReferences
         # noinspection PySuperArguments
         l = wait(lambda: super(common.FindOverride, self._owner).find_elements(*self._locator), self.wait_timeout)
-        cache = [(w.id, w.parent) for w in l]
+        cache = [w.id for w in l]
         self.__initialize_elements(cache)
         self.__cache[self._owner] = cache
 
@@ -230,7 +228,8 @@ class PageElementsList(common.BasePageElement):
         else:
             del self.__items[new_len:]
         for e, l in zip(self.__items, items):
-            setattr(e, "_id", l[0]), setattr(e, "_parent", l[1]), setattr(e, "_w3c", self._w3c)
+            setattr(e, "_id", l), setattr(e, "_parent", self._parent)
+            setattr(e, "_w3c", self._w3c), setattr(e, "_owner", self._owner)
 
     def _fill_owner(self, owner):
         super(PageElementsList, self)._fill_owner(owner)

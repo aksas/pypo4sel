@@ -35,7 +35,7 @@ class PageElementsContainer(object):
         """returns all public BasePageElements grouped by this element and it parent(s)
         :rtype: list[(str, BasePageElement)]
         """
-        return [(k, v) for k, v in get_members_safety(self)
+        return [(k, v) for k, v in get_members_safety(self.__class__)
                 if not k.startswith("_") and isinstance(v, (BasePageElement,))]
 
 
@@ -146,7 +146,8 @@ class FindOverride(object):
         :param el_class:
         :return:
         """
-        return self.find_elements(by, value, el_class)
+        el, selector = define_selector(by, value, el_class)
+        return self._init_element(elements.PageElementsList(selector, el))
 
     def find_element(self, by=By.ID, value=None, el_class=None):
         """
@@ -190,8 +191,9 @@ class FindOverride(object):
         :rtype: PageElementsList[T | ListElement]
         :return:
         """
-        el, selector = define_selector(by, value, el_class)
-        return self._init_element(elements.PageElementsList(selector, el))
+        els = self.child_elements(by, value, el_class)
+        els.reload()
+        return els
 
     def _init_element(self, element):
         # noinspection PyProtectedMember

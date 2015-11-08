@@ -52,7 +52,7 @@ __All__ = ["step", "listeners", "message", "action", "debug"]
 
 
 class Options(object):
-    FIRST_PARAM = "first_param"
+    STEP_MESSAGE = "first_param"
     STEP_NAME = "step_name"
     ELEMENT_NAME = "element_name"
     KWARGS = "kwargs"
@@ -91,18 +91,13 @@ class step(object):
             raise Exception("Only one unnamed parameter is allowed.")
         self.options = kwargs
         if len(args) == 1:
-            self.options[Options.FIRST_PARAM] = args[0]
+            self.options[Options.STEP_MESSAGE] = args[0]
 
     def __call__(self, method):
         return _decorator(method, self.options)
 
     def __enter__(self):
-        assert "first_param" in self.options
-        self.options.setdefault(Options.STEP_NAME, self.options[Options.FIRST_PARAM])
-        self.options.setdefault(Options.ELEMENT_NAME, None)
-        self.options.setdefault(Options.KWARGS, None)
-        self.options.setdefault(Options.ARGS, None)
-
+        assert Options.STEP_MESSAGE in self.options
         self.step_id = _notify_start(**self.options)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -128,19 +123,16 @@ def message(msg, **kwargs):
 
 
 def _decorator(method, step_options):
-    step_options.setdefault("step_name", method.func_name)
+    step_options.setdefault(Options.STEP_NAME, method.func_name)
 
     @functools.wraps(method)
     def wrapper(*args, **kwargs):
         fargs = args
-        if len(args) > 0:
-            if hasattr(args[0], "_name"):
+        if len(args) > 0 and hasattr(args[0], "_name"):
                 # noinspection PyProtectedMember
-                step_options.setdefault("element_name", args[0]._name)
-                args = args[1:]
-        step_options.setdefault("element_name", None)
-        step_options.setdefault("kwargs", kwargs)
-        step_options.setdefault("args", args)
+                step_options.setdefault(Options.ELEMENT_NAME, args[0]._name)
+        step_options.setdefault(Options.KWARGS, kwargs)
+        step_options.setdefault(Options.ARGS, args)
         step_id = _notify_start(**step_options)
         try:
             return method(*fargs, **kwargs)

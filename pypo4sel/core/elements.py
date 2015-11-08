@@ -2,8 +2,8 @@ import hashlib
 import time
 import uuid
 
-from selenium.webdriver.remote.webelement import WebElement
 from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
+from selenium.webdriver.remote.webelement import WebElement
 
 import common
 import log2l
@@ -147,7 +147,7 @@ class PageElement(common.BasePageElement, common.PageElementsContainer, common.F
         return None
 
     def __hash__(self):
-        return int(hashlib.md5(self.id+'-'+self._parent.session_id).hexdigest(), 16)
+        return int(hashlib.md5(self.id).hexdigest(), 16)
 
 
 class _ListItem(object):

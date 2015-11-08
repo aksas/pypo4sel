@@ -1,10 +1,10 @@
-from abc import abstractmethod
 import inspect
 import re
+from abc import abstractmethod
 
+import six
 from selenium.common.exceptions import InvalidSelectorException, NoSuchElementException
 from selenium.webdriver.common.by import By
-import six
 
 WAIT_STALE_ELEMENT_MAX_TRY = 5
 WAIT_ELEMENT_TIMEOUT = 0
@@ -52,6 +52,7 @@ class BasePageElement(object):
         self._parent = None
         """ :type: FindOverride """
         self.__timeout = timeout
+        self._w3c = False
 
     def _fill_owner(self, owner):
         # _parent and _id field are native for Selenium WebDriver WebElement
@@ -132,7 +133,7 @@ class FindOverride(object):
         :param value:
         :type el_class: T <= PageElement
         :param el_class:
-        :rtype: T | PageElement
+        :rtype: T <= PageElement
         :return:
         """
         el, selector = define_selector(by, value, el_class)
@@ -165,7 +166,7 @@ class FindOverride(object):
         :param value:
         :type el_class: T <= PageElement
         :param el_class:
-        :rtype: T | PageElement
+        :rtype: T <= PageElement
         :return:
         """
         el = self.child_element(by, value, el_class)

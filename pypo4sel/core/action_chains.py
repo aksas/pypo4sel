@@ -7,7 +7,6 @@ from selenium.webdriver.remote.command import Command
 from .common import WAIT_STALE_ELEMENT_MAX_TRY, WAIT_ELEMENT_POLL_FREQUENCY
 
 
-# noinspection PyProtectedMember
 class ActionChains(webdriver.ActionChains):
     def __move_to(self, element, xoffset=None, yoffset=None):
         params = {'element': element.id}

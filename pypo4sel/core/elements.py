@@ -131,8 +131,8 @@ class PageElement(common.BasePageElement, common.PageElementsContainer, common.F
             self._id = self.__cache.get(self._owner)
 
     def has_class(self, class_name):
-        class_attribute = self.get_attribute('class')
-        return False if class_attribute is None else re.search(r'(^|\s){}(\s|$)'.format(class_name), class_attribute) is not None
+        cls_attr = self.get_attribute('class')
+        return False if cls_attr is None else re.search(r'(^|\s){}(\s|$)'.format(class_name), cls_attr) is not None
 
     def _execute(self, command, params=None):
         if not self.__cached__ or self._id is None:

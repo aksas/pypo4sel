@@ -36,7 +36,7 @@ class PageElementsContainer(object):
         """returns all public BasePageElements grouped by this element and it parent(s)
         :rtype: list[(str, BasePageElement)]
         """
-        return [(k, v) for k, v in get_members_safety(self.__class__)
+        return [(k, v) for k, v in inspect.getmembers(self)
                 if not k.startswith("_") and isinstance(v, (BasePageElement,))]
 
 

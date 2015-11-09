@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pypo4sel.core.log2l import ListenerMixin, Options
+from pypo4sel.core.log2l import ListenerMixin, Options, listeners
 
 
 class Step(object):
@@ -13,7 +13,9 @@ class Step(object):
 
 class SimpleLogger(ListenerMixin):
     steps = []
+    """ :type: list[Step]"""
     stack = []
+    """ :type: list[Step]"""
     suppress = None
 
     def start_step(self, step_id, **options):
@@ -45,6 +47,44 @@ class SimpleLogger(ListenerMixin):
 
     def _add_step(self, step):
         if self.stack:
-            self.stack[-1].sub_step.append(step)
+            self.stack[-1].sub_steps.append(step)
         else:
             self.steps.append(step)
+
+
+from nose.plugins import Plugin
+
+
+# noinspection PyPep8Naming
+class PypoNose(Plugin):
+    name = 'pyponose'
+
+    def __init__(self):
+        super(PypoNose, self).__init__()
+        self.log_store = SimpleLogger()
+        listeners.append(self.log_store)
+
+    def addError(self, test, err):
+        pass
+
+    def addFailure(self, test, err):
+        pass
+
+    def addSuccess(self, test):
+        print str(test), getattr(test, 'testcontext', None)
+
+    def beforeTest(self, test):
+        self.log_store.start_step(-1, **{Options.STEP_NAME: str(test)})
+        self.log_store.message('before test' + str(test))
+
+    def afterTest(self, test):
+        self.log_store.end_step(-1)
+
+    def startContext(self, context):
+        self.log_store.start_step(-1, **{Options.STEP_NAME: context.__name__})
+
+    def stopContext(self, context):
+        self.log_store.end_step(-1)
+
+    def finalize(self, res):
+        print res, self.log_store

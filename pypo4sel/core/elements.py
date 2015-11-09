@@ -1,4 +1,5 @@
 import hashlib
+import re
 import time
 import uuid
 
@@ -128,6 +129,10 @@ class PageElement(common.BasePageElement, common.PageElementsContainer, common.F
         super(PageElement, self)._fill_owner(owner)
         if self.__cached__ and self._id is not None:
             self._id = self.__cache.get(self._owner)
+
+    def has_class(self, class_name):
+        class_attribute = self.get_attribute('class')
+        return False if class_attribute is None else re.search(r'(^|\s){}(\s|$)'.format(class_name), class_attribute) is not None
 
     def _execute(self, command, params=None):
         if not self.__cached__ or self._id is None:

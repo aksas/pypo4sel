@@ -1,4 +1,5 @@
 from HTMLParser import HTMLParser
+from htmlentitydefs import name2codepoint
 
 __all__ = ["self_text", "inner_text"]
 
@@ -35,6 +36,16 @@ class ParseText(HTMLParser):
         self.inner_text += data
         n, t = self.__tags[-1]
         self.__tags[-1] = n, t + data
+
+    def handle_entityref(self, name):
+        self.handle_data(unichr(name2codepoint[name]))
+
+    def handle_charref(self, name):
+        if name[0] == 'x':
+            n = int(name[1:], 16)
+        else:
+            n = int(name)
+        self.handle_data(unichr(n))
 
 
 def self_text(element):

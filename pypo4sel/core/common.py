@@ -25,11 +25,12 @@ class PageElementsContainer(object):
     than it should have attribute 'driver' with web driver instance.
     """
 
-    def __new__(cls, *more):
+    def __new__(cls, *args, **kwargs):
         for k, v in get_members_safety(cls):
             if isinstance(v, (BasePageElement,)) and v._name is None:
                 v._name = k
-        return super(PageElementsContainer, cls).__new__(cls, *more)
+        # noinspection PyArgumentList
+        return super(PageElementsContainer, cls).__new__(cls, *args, **kwargs)
 
     def all_elements(self):
         """returns all public BasePageElements grouped by this element and it parent(s)

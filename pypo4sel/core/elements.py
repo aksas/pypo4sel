@@ -21,13 +21,13 @@ class PageElement(common.BasePageElement, common.PageElementsContainer, common.F
     Class instance may be used as a part of page object/page block
     or class type may be specified directly as last parameter of find/child_element(s) to wrap found element(s).
 
-    For page object filed may be specified __set__ method for more useful interaction with the element.
+    For page object field may be specified __set__ method for more useful interaction with the element.
     In this case ``_fill_owner`` should be called first in the __set__ method.
 
     Examples:
 
     class SomePageBlock(PageElement):
-        filed = PageElement("#filed_id")
+        field = PageElement("#field_id")
         element = PageElement("#element_id")
 
         def do_some_work(self, keys):
@@ -62,15 +62,9 @@ class PageElement(common.BasePageElement, common.PageElementsContainer, common.F
         self._id = None
         self.__cache = {}
 
-    def reload(self):
-        # noinspection PyUnresolvedReferences
-        # noinspection PySuperArguments
-        we = wait(common.find, self.wait_timeout, owner=self._owner, locator=self._locator)
-        if not we:
-            raise NoSuchElementException("Element with selector {} was not found".format(self._locator))
-        self._id = we.id
-        self._parent = we.parent
-        self.__cache[self._owner] = self._id
+    def has_class(self, class_name):
+        cls_attr = self.get_attribute('class')
+        return False if cls_attr is None else re.search(r'(^|\s){}(\s|$)'.format(class_name), cls_attr) is not None
 
     def exists(self):
         """
@@ -125,14 +119,18 @@ class PageElement(common.BasePageElement, common.PageElementsContainer, common.F
     def clear(self):
         super(PageElement, self).clear()
 
+    def reload(self):
+        we = wait(common.find, self.wait_timeout, owner=self._owner, locator=self._locator)
+        if not we:
+            raise NoSuchElementException("Element with selector {} was not found".format(self._locator))
+        self._id = we.id
+        self._parent = we.parent
+        self.__cache[self._owner] = self._id
+
     def _fill_owner(self, owner):
         super(PageElement, self)._fill_owner(owner)
         if self.__cached__ and self._id is not None:
             self._id = self.__cache.get(self._owner)
-
-    def has_class(self, class_name):
-        cls_attr = self.get_attribute('class')
-        return False if cls_attr is None else re.search(r'(^|\s){}(\s|$)'.format(class_name), cls_attr) is not None
 
     def _execute(self, command, params=None):
         if not self.__cached__ or self._id is None:
@@ -184,7 +182,6 @@ class _ListItem(object):
         self._container.wait_timeout = t
 
 
-# noinspection PyAbstractClass
 class PageElementsList(common.BasePageElement):
     """
     Provide list interface for list of page elements.
@@ -217,6 +214,19 @@ class PageElementsList(common.BasePageElement):
         self.__cache = {}
         self.__items = []
 
+    def is_displayed(self):
+        """
+        :return: True id at least one element is displayed, otherwise False.
+                Ignore implicit and element timeouts and execute immediately.
+        """
+        t = self.wait_timeout
+        self.wait_timeout = 0
+        try:
+            self.reload()
+            return any(e.is_displayed() for e in self)
+        finally:
+            self.wait_timeout = t
+
     def reload(self):
         # noinspection PyUnresolvedReferences
         # noinspection PySuperArguments
@@ -248,7 +258,11 @@ class PageElementsList(common.BasePageElement):
     def __getitem__(self, index):
         if not self.__cached__ or self._owner not in self.__cache:
             self.reload()
-        return self.__items[index]
+        try:
+            return self.__items[index]
+        except IndexError:
+            self.reload()
+            return self.__items[index]
 
     def __iter__(self):
         self.reload()
@@ -259,19 +273,6 @@ class PageElementsList(common.BasePageElement):
                 i += 1
             except IndexError:
                 return
-
-    def is_displayed(self):
-        """
-        :return: True id at least one element is displayed, otherwise False.
-                Ignore implicit and element timeouts and execute immediately.
-        """
-        t = self.wait_timeout
-        self.wait_timeout = 0
-        try:
-            self.reload()
-            return any(e.is_displayed() for e in self)
-        finally:
-            self.wait_timeout = t
 
 
 class VirtualElement(common.BasePageElement, common.PageElementsContainer, common.FindOverride):

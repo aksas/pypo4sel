@@ -65,10 +65,10 @@ class ListenerMixin(object):
     def start_step(self, step_id, **options):
         pass
 
-    def end_step(self, step_id):
+    def end_step(self, step_id, **options):
         pass
 
-    def exception(self, step_id, exc_type, exc_val, exc_tb):
+    def exception(self, step_id, err, **options):
         pass
 
     def message(self, msg, **kwargs):
@@ -102,7 +102,7 @@ class step(object):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is not None:
-            _notify_exception(self.step_id, exc_type, exc_val, exc_tb)
+            _notify_exception(self.step_id, (exc_type, exc_val, exc_tb))
         _notify_end(self.step_id)
 
 
@@ -137,7 +137,7 @@ def _decorator(method, step_options):
         try:
             return method(*fargs, **kwargs)
         except Exception:
-            _notify_exception(step_id, *sys.exc_info())
+            _notify_exception(step_id, sys.exc_info())
             raise
         finally:
             _notify_end(step_id)
@@ -151,9 +151,9 @@ def _notify_start(**options):
     return step_id
 
 
-def _notify_end(step_id):
-    [l.end_step(step_id) for l in listeners]
+def _notify_end(step_id, **options):
+    [l.end_step(step_id, **options) for l in listeners]
 
 
-def _notify_exception(step_id, exc_type, exc_val, exc_tb):
-    [l.exception(step_id, exc_type, exc_val, exc_tb) for l in listeners]
+def _notify_exception(step_id, err, **options):
+    [l.exception(step_id, err, **options) for l in listeners]

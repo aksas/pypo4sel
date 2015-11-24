@@ -30,11 +30,11 @@ class TestFewTest(unittest.TestCase):
     def tearDownClass(cls):
         super(TestFewTest, cls).tearDownClass()
         log2l.message('teardown class')
+        assert False
 
     def tearDown(self):
         super(TestFewTest, self).tearDown()
         log2l.message('tear down')
-        assert False
 
     def test(self):
         common_actions()
@@ -61,8 +61,8 @@ class TestOneTest(unittest.TestCase):
             assert False, 'fail message'
 
 
-from examples.simple_nose import PypoNose
-
-if __name__ == '__main__':
-    pl = PypoNose()
-    result = nose.run(addplugins=[pl], argv=['', '--with-pyponose'])
+# from examples.simple_nose import PypoNose
+#
+# if __name__ == '__main__':
+#     pl = PypoNose()
+#     result = nose.run(addplugins=[pl], argv=['', '--with-pyponose'])

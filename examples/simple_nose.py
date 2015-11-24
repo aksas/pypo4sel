@@ -1,16 +1,14 @@
 import traceback
-from unittest import SkipTest
 
 from allure.common import AllureImpl
 from allure.constants import Status, Label, AttachmentType, Severity
-from allure.structure import TestLabel, TestStep
+from allure.structure import TestLabel
 from nose.plugins import Plugin
 from nose.plugins.attrib import attr
 from pypo4sel.core import log2l
 from pypo4sel.core.log2l import Options, ListenerMixin
 
-
-# noinspection PyPep8Naming
+# noinspection PyPep8Naming,PyProtectedMember
 class PypoNose(Plugin):
     name = 'pyponose'
 
@@ -20,17 +18,17 @@ class PypoNose(Plugin):
         log2l.listeners.append(AllureLogger("test_report"))
 
     def begin(self):
-        id_ = log2l._notify_start()
+        id_ = log2l._notify_start(suit='BEGIN')
         self._stack.append(id_)
 
     def addError(self, test, err):
-        log2l._notify_exception(self._stack[-1], *err, test=test)
+        log2l._notify_exception(self._stack[-1], err, test=test)
 
     def addFailure(self, test, err):
-        log2l._notify_exception(self._stack[-1], *err, test=test)
+        log2l._notify_exception(self._stack[-1], err, test=test)
 
     def addSkip(self, test):
-        pass
+        log2l._notify_exception(self._stack[-1], "skip", test=test)
 
     def beforeTest(self, test):
         id_ = log2l._notify_start(test=test)
@@ -81,134 +79,6 @@ def severity_level():
     return Severity
 
 
-class AllureLoggerI(ListenerMixin):
-    def __init__(self, log_dir):
-        self.impl = AllureImpl(log_dir)
-        self.store = {}
-        self.suppress = None
-        self.error = None
-        self.precondition_steps = False
-        self.suits = []
-
-    def _before(self):
-        if self.precondition_steps:
-            self._stop_test()
-            self.precondition_steps = False
-        self.error = None
-        self.suppress = None
-
-    def _start_context(self, name, doc):
-        self._before()
-        self.impl.start_suite(name, doc)
-        self.suits.append(self.impl.testsuite)
-
-    def _stop_context(self):
-        if self.precondition_steps:
-            self.precondition_steps = False
-        if self.impl.testsuite and self.impl.testsuite.tests:
-            self.impl.stop_suite()
-        if len(self.suits) > 1:
-            self.suits.pop()
-            self.impl.testsuite = self.suits[-1]
-        else:
-            self.impl.testsuite = None
-            self.suits = []
-
-    def _start_test(self, test):
-        self._before()
-        if hasattr(test.test, "test"):
-            method = test.test.test
-        else:
-            method = getattr(test.test, test.test._testMethodName)
-        hierarchy = ".".join(test.address()[1:])
-        self.impl.start_case(hierarchy, description=method.__doc__, labels=get_labels(method))
-
-    def _stop_test(self):
-        if self.error:
-            self.impl.stop_case(**self.error)
-            if self.precondition_steps:
-                self._stop_context()
-        else:
-            self.impl.stop_case(Status.PASSED)
-        self.impl.stack.pop()
-        self.error = None
-        self.suppress = None
-
-    def _test_step(self, options):
-        if Options.STEP_MESSAGE in options:
-            message = options[Options.STEP_MESSAGE].format(**options)
-        elif Options.ELEMENT_NAME in options:
-            params = str(options[Options.ARGS][1:]) if len(options[Options.ARGS]) > 1 else ""
-            params += str(options[Options.KWARGS]) if len(options[Options.KWARGS]) > 0 else ""
-            message = "on {} do {} with {}" if params else "on {} do {}"
-            message = message.format(options[Options.ARGS][0].name, options[Options.STEP_NAME], params)
-        else:
-            message = options[Options.STEP_NAME]
-        return self.impl.start_step(message)
-
-    def start_step(self, step_id, **options):
-        if not options:
-            self._start_context('Global', None)
-            self.store[step_id] = 'START'
-        elif 'suit' in options:
-            suit = options['suit']
-            name = suit.__name__
-            if hasattr(suit, '__module__'):
-                name = suit.__module__ + '.' + name
-            self._start_context(name, suit.__doc__)
-            self.store[step_id] = 'SUIT'
-        elif 'test' in options:
-            self._start_test(options['test'])
-            self.store[step_id] = 'TEST'
-        elif self.suppress is None:
-            self.suppress = step_id if options.get(Options.SUPPRESS_CHILD_LOGS, False) else None
-            self.store[step_id] = self._test_step(options)
-        else:
-            self.store[step_id] = 'suppressed'
-
-    def end_step(self, step_id, **kwargs):
-        t = self.store.pop(step_id)
-        if t == 'START':
-            self._stop_context()
-            self.impl.store_environment()
-        elif t == 'SUIT':
-            self._stop_context()
-        elif t == 'TEST':
-            self._stop_test()
-        elif isinstance(t, TestStep):
-            if self.error:
-                t.status = self.error['status']
-            else:
-                t.status = Status.PASSED
-            self.impl.stop_step()
-
-    def exception(self, step_id, exc_type, exc_val, exc_tb):
-        if self.error is None and exc_type is not None:
-            failure = getattr(self.store[step_id], 'failureException', AssertionError)
-            if exc_type == SkipTest:
-                status = Status.CANCELED
-            elif exc_type == failure:
-                status = Status.FAILED
-            else:
-                status = Status.BROKEN
-            message = ''.join(traceback.format_exception_only(exc_type, exc_val)).strip()
-            trace = ''.join(traceback.format_exception(exc_type, exc_val, exc_tb)).strip()
-            self.error = dict(status=status, message=message, trace=trace)
-
-    def message(self, msg, **kwargs):
-        if not self.impl.stack:
-            self.impl.start_case(self.impl.testsuite.name + ".Preconditions")
-            self.precondition_steps = True
-        if 'attach' in kwargs:
-            self.impl.attach(msg, kwargs['attach']['contents'], kwargs['attach']['type'])
-        else:
-            if 'details' in kwargs:
-                self.impl.attach(msg, kwargs['details'], AttachmentType.TEXT)
-            else:
-                self.impl.start_step(msg)
-                self.impl.stop_step()
-
-
 def get_labels(test):
     def get_markers(item, name):
         markers = []
@@ -238,18 +108,41 @@ class AllureLogger(ListenerMixin):
         self.impl = AllureImpl(log_dir)
 
     def start_step(self, step_id, **options):
-        super(AllureLogger, self).start_step(step_id, **options)
+        if 'suit' in options:
+            suit = options['suit']
+            if suit == 'BEGIN':
+                self._start_context('Global', None)
+            else:
+                name = suit.__name__
+                if hasattr(suit, '__module__'):
+                    name = suit.__module__ + '.' + name
+                self._start_context(name, suit.__doc__)
+        elif 'test' in options:
+            self._start_test(options['test'])
+        elif self.suppress is None:
+            self.suppress = step_id if options.get(Options.SUPPRESS_CHILD_LOGS, False) else None
+            self._test_step(options)
 
     def end_step(self, step_id, **options):
-        super(AllureLogger, self).end_step(step_id, **options)
+        if 'res' in options:
+            self._end_context()
+            self.impl.store_environment()
+        elif 'suit' in options:
+            self._end_context()
+        elif 'test' in options:
+            self._store_test()
+        else:
+            if step_id == self.suppress:
+                self.suppress = None
+            if self.suppress is None:
+                if self.error:
+                    self.impl.stack[-1].status = self.error['status']
+                else:
+                    self.impl.stack[-1].status = Status.PASSED
+                self.impl.stop_step()
 
     def message(self, msg, **kwargs):
-        if not self.impl.stack:  # there are no current tests
-            self.suppress = None
-            self.error = None
-            self.impl.start_case(self.impl.testsuite.name + ".Preconditions")
-            # TODO handle teardown actions
-            self.preconditions = True
+        self._check_test_started()
         if 'attach' in kwargs:
             self.impl.attach(msg, kwargs['attach']['contents'], kwargs['attach']['type'])
         else:
@@ -259,19 +152,45 @@ class AllureLogger(ListenerMixin):
                 self.impl.start_step(msg)
                 self.impl.stop_step()
 
+    def _check_test_started(self):
+        if not self.impl.stack:  # there are no current tests
+            self.suppress = None
+            self.error = None
+            if self.impl.testsuite.tests:
+                self.impl.start_case(self.impl.testsuite.name + ".TearDown")
+            else:
+                self.impl.start_case(self.impl.testsuite.name + ".Preconditions")
+            self.preconditions = True
+
     def exception(self, step_id, err, **options):
-        exc_type, exc_val, exc_tb = err
-        if self.error is None and exc_type is not None:
-            failure = getattr(self.store[step_id], 'failureException', AssertionError)
-            if exc_type == SkipTest:
-                status = Status.CANCELED
-            elif exc_type == failure:
+        if err == 'skip':
+            self.error = dict(status=Status.CANCELED, message=None, trace=None)
+        elif self.error is None:
+            exc_type, exc_val, exc_tb = err
+            failure = getattr(options.get('test', ''), 'failureException', AssertionError)
+            if exc_type == failure:
                 status = Status.FAILED
             else:
                 status = Status.BROKEN
             message = ''.join(traceback.format_exception_only(exc_type, exc_val)).strip()
             trace = ''.join(traceback.format_exception(exc_type, exc_val, exc_tb)).strip()
             self.error = dict(status=status, message=message, trace=trace)
+
+    def _test_step(self, options):
+        self._check_test_started()
+        if Options.STEP_MESSAGE in options:
+            message = options[Options.STEP_MESSAGE].format(**options)
+        elif Options.ELEMENT_NAME in options:
+            params = str(options[Options.ARGS][1:]) if len(options[Options.ARGS]) > 1 else ""
+            params += str(options[Options.KWARGS]) if len(options[Options.KWARGS]) > 0 else ""
+            message = "{} of {} perform {} with {}" if params else "{} of {} perform {}"
+            # noinspection PyProtectedMember
+            message = message.format(options[Options.ARGS][0].name,
+                                     options[Options.ARGS][0]._owner.name,
+                                     options[Options.STEP_NAME], params)
+        else:
+            message = options[Options.STEP_NAME]
+        return self.impl.start_step(message)
 
     def _store_test(self):
         if self.error:
@@ -281,6 +200,8 @@ class AllureLogger(ListenerMixin):
         self.impl.stack.pop()
 
     def _start_test(self, test):
+        self.suppress = None
+        self.error = None
         if self.preconditions:
             self._store_test()
             self.preconditions = False
@@ -288,8 +209,6 @@ class AllureLogger(ListenerMixin):
             method = test.test.test
         else:
             method = getattr(test.test, test.test._testMethodName)
-        self.suppress = None
-        self.error = None
         hierarchy = ".".join(test.address()[1:])
         self.impl.start_case(hierarchy, description=method.__doc__, labels=get_labels(method))
 
@@ -304,16 +223,23 @@ class AllureLogger(ListenerMixin):
             self.suits = []
 
     def _start_context(self, name, doc):
-        if self.preconditions and self.error:
+        if self.preconditions:
+            # setup of previous suit
             self._store_test()
-            self._store_context()
+            if self.error:
+                # fails
+                self._store_context()
             self.preconditions = False
         self.impl.start_suite(name, doc)
         self.suits.append(self.impl.testsuite)
 
-    def _end_context(self, context):
+    def _end_context(self):
         if self.preconditions:
+            # tear down actions
             self._store_test()
+            if self.error:
+                # fails in nested suit
+                self._store_context()
             self.preconditions = False
-        # TODO handle `another context end after error
         self._store_context()
+

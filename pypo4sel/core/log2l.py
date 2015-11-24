@@ -127,13 +127,14 @@ def _decorator(method, step_options):
 
     @functools.wraps(method)
     def wrapper(*args, **kwargs):
+        options = step_options.copy()
         fargs = args
         if len(args) > 0 and hasattr(args[0], "_name"):
                 # noinspection PyProtectedMember
-                step_options.setdefault(Options.ELEMENT_NAME, args[0]._name)
-        step_options.setdefault(Options.KWARGS, kwargs)
-        step_options.setdefault(Options.ARGS, args)
-        step_id = _notify_start(**step_options)
+                options.setdefault(Options.ELEMENT_NAME, args[0]._name)
+        options.setdefault(Options.KWARGS, kwargs)
+        options.setdefault(Options.ARGS, args)
+        step_id = _notify_start(**options)
         try:
             return method(*fargs, **kwargs)
         except Exception:

@@ -108,6 +108,11 @@ class step(object):
 
 # noinspection PyPep8Naming
 class action(step):
+    def __new__(cls, *args, **kwargs):
+        if len(args) == 1 and callable(args[0]):
+            return _decorator(args[0], {Options.SUPPRESS_CHILD_LOGS:True})
+        return super(step, cls).__new__(cls)
+
     def __init__(self, *args, **kwargs):
         super(action, self).__init__(*args, **kwargs)
         self.options[Options.SUPPRESS_CHILD_LOGS] = True

@@ -1,12 +1,17 @@
 import traceback
 
+import sys
 from allure.common import AllureImpl
-from allure.constants import Status, Label, AttachmentType, Severity
+from allure.constants import Status, Label, AttachmentType, Severity, ALLURE_NAMESPACE
+from allure.rules import xmlfied, Element, Nested, WrappedMany, Attribute, Rule, element_maker, legalize_xml
 from allure.structure import TestLabel
+from allure.utils import unicodify, now
 from nose.plugins import Plugin
 from nose.plugins.attrib import attr
+
 from pypo4sel.core import log2l
 from pypo4sel.core.log2l import Options, ListenerMixin
+
 
 # noinspection PyPep8Naming,PyProtectedMember
 class PypoNose(Plugin):
@@ -80,23 +85,57 @@ def severity_level():
 
 
 def get_labels(test):
-    def get_markers(item, name):
+    def get_markers(item):
         markers = []
 
         for prop in dir(item):
             if prop.startswith(Label.DEFAULT):
                 key = prop.split('_')[-1]
-                value = getattr(item, prop)
-                markers.append((key, value))
+                v = getattr(item, prop)
+                markers.append((key, v))
 
         return markers
 
     labels = []
-    label_markers = get_markers(test, Label.DEFAULT)
+    label_markers = get_markers(test)
     for name, value in label_markers:
         labels.append(TestLabel(name=name, value=value))
 
     return labels
+
+
+class Description(Element):
+    def value(self, name, what):
+        if isinstance(what, tuple):
+            val = legalize_xml(unicodify(what[1]))
+            tp = what[0]
+        else:
+            val = legalize_xml(unicodify(what))
+            tp = 'text'
+        return element_maker(self.name or name, self.namespace)(val, type=tp)
+
+TestCase = xmlfied('test-case',
+                   name=Element(),
+                   title=Element().if_(lambda x: x),
+                   description=Description().if_(lambda x: x),
+                   failure=Nested().if_(lambda x: x),
+                   steps=WrappedMany(Nested()),
+                   attachments=WrappedMany(Nested()),
+                   labels=WrappedMany(Nested()),
+                   status=Attribute(),
+                   start=Attribute(),
+                   stop=Attribute())
+
+
+TestSuite = xmlfied('test-suite',
+                    namespace=ALLURE_NAMESPACE,
+                    name=Element(),
+                    title=Element().if_(lambda x: x),
+                    description=Description().if_(lambda x: x),
+                    tests=WrappedMany(Nested(), name='test-cases'),
+                    labels=WrappedMany(Nested()),
+                    start=Attribute(),
+                    stop=Attribute())
 
 
 class AllureLogger(ListenerMixin):
@@ -142,25 +181,16 @@ class AllureLogger(ListenerMixin):
                 self.impl.stop_step()
 
     def message(self, msg, **kwargs):
-        self._check_test_started()
-        if 'attach' in kwargs:
-            self.impl.attach(msg, kwargs['attach']['contents'], kwargs['attach']['type'])
-        else:
-            if 'details' in kwargs:
-                self.impl.attach(msg, kwargs['details'], AttachmentType.TEXT)
+        if self.suppress is None:
+            self._check_test_started()
+            if 'attach' in kwargs:
+                self.impl.attach(msg, kwargs['attach']['contents'], kwargs['attach']['type'])
             else:
-                self.impl.start_step(msg)
-                self.impl.stop_step()
-
-    def _check_test_started(self):
-        if not self.impl.stack:  # there are no current tests
-            self.suppress = None
-            self.error = None
-            if self.impl.testsuite.tests:
-                self.impl.start_case(self.impl.testsuite.name + ".TearDown")
-            else:
-                self.impl.start_case(self.impl.testsuite.name + ".Preconditions")
-            self.preconditions = True
+                if 'details' in kwargs:
+                    self.impl.attach(msg, kwargs['details'], AttachmentType.TEXT)
+                else:
+                    self.impl.start_step(msg)
+                    self.impl.stop_step()
 
     def exception(self, step_id, err, **options):
         if err == 'skip':
@@ -175,6 +205,16 @@ class AllureLogger(ListenerMixin):
             message = ''.join(traceback.format_exception_only(exc_type, exc_val)).strip()
             trace = ''.join(traceback.format_exception(exc_type, exc_val, exc_tb)).strip()
             self.error = dict(status=status, message=message, trace=trace)
+
+    def _check_test_started(self):
+        if not self.impl.stack:  # there are no current tests
+            self.suppress = None
+            self.error = None
+            if self.impl.testsuite.tests:
+                self._start_case(self.impl.testsuite.name + ".TearDown")
+            else:
+                self._start_case(self.impl.testsuite.name + ".Preconditions")
+            self.preconditions = True
 
     def _test_step(self, options):
         self._check_test_started()
@@ -208,9 +248,21 @@ class AllureLogger(ListenerMixin):
         if hasattr(test.test, "test"):
             method = test.test.test
         else:
+            # noinspection PyProtectedMember
             method = getattr(test.test, test.test._testMethodName)
         hierarchy = ".".join(test.address()[1:])
-        self.impl.start_case(hierarchy, description=method.__doc__, labels=get_labels(method))
+        self._start_case(hierarchy, description=method.__doc__, labels=get_labels(method))
+
+    def _start_case(self, name, description=None, labels=None):
+        if description:
+            description = ('markdown', cleandoc(description))
+        test = TestCase(name=name,
+                        description=description,
+                        start=now(),
+                        attachments=[],
+                        labels=labels or [],
+                        steps=[])
+        self.impl.stack.append(test)
 
     def _store_context(self):
         if self.impl.testsuite and self.impl.testsuite.tests:
@@ -230,7 +282,7 @@ class AllureLogger(ListenerMixin):
                 # fails
                 self._store_context()
             self.preconditions = False
-        self.impl.start_suite(name, doc)
+        self._start_suite(name, doc)
         self.suits.append(self.impl.testsuite)
 
     def _end_context(self):
@@ -243,3 +295,33 @@ class AllureLogger(ListenerMixin):
             self.preconditions = False
         self._store_context()
 
+    def _start_suite(self, name, description=None, title=None, labels=None):
+        if description:
+            description = ('markdown', cleandoc(description))
+        self.impl.testsuite = TestSuite(name=name,
+                                        title=title,
+                                        description=description,
+                                        tests=[],
+                                        labels=labels or [],
+                                        start=now())
+
+
+def cleandoc(doc):
+    if doc:
+        lines = doc.expandtabs().splitlines()
+        margin = sys.maxint
+        for line in lines[1:]:
+            content = len(line.lstrip())
+            if content:
+                margin = min(margin, len(line) - content)
+        trimmed = [lines[0].strip()]
+        if margin < sys.maxint:
+            for line in lines[1:]:
+                trimmed.append(line[margin:])
+
+        while trimmed and not trimmed[-1]:
+            trimmed.pop()
+        while trimmed and not trimmed[0]:
+            trimmed.pop(0)
+        return '\n'.join(trimmed)
+    return doc

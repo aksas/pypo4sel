@@ -1,14 +1,29 @@
+import functools
 import hashlib
 import re
 import time
 import uuid
 
-from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
+from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException, \
+    ElementNotVisibleException
 from selenium.webdriver.remote.webelement import WebElement
 
 import common
 import log2l
+from pypo4sel.core.waiter import wait_displayed
 from waiter import wait
+
+
+def need_interaction(func):
+    @functools.wraps(func)
+    def wrap(*args, **kwargs):
+        el = args[0]
+        el._wait_ready_for_interaction = True
+        try:
+            return func(*args, **kwargs)
+        finally:
+            el._wait_ready_for_interaction = False
+    return wrap
 
 
 class PageElement(common.BasePageElement, common.PageElementsContainer, common.FindOverride, WebElement):
@@ -61,6 +76,7 @@ class PageElement(common.BasePageElement, common.PageElementsContainer, common.F
         self._parent = None
         self._id = None
         self.__cache = {}
+        self._wait_ready_for_interaction = False
 
     def has_class(self, class_name):
         cls_attr = self.get_attribute('class')
@@ -104,18 +120,22 @@ class PageElement(common.BasePageElement, common.PageElementsContainer, common.F
         return self._id
 
     @log2l.step
+    @need_interaction
     def send_keys(self, *value):
         super(PageElement, self).send_keys(*value)
 
     @log2l.step
+    @need_interaction
     def submit(self):
         super(PageElement, self).submit()
 
     @log2l.step
+    @need_interaction
     def click(self):
         super(PageElement, self).click()
 
     @log2l.step
+    @need_interaction
     def clear(self):
         super(PageElement, self).clear()
 
@@ -139,6 +159,9 @@ class PageElement(common.BasePageElement, common.PageElementsContainer, common.F
         execute_attempts = 0
         while True:
             try:
+                if self._wait_ready_for_interaction:
+                    if not wait_displayed(self):
+                        raise ElementNotVisibleException()
                 val = super(PageElement, self)._execute(command, params)
                 return val
             except StaleElementReferenceException:

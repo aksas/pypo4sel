@@ -110,7 +110,7 @@ class step(object):
 class action(step):
     def __new__(cls, *args, **kwargs):
         if len(args) == 1 and callable(args[0]):
-            return _decorator(args[0], {Options.SUPPRESS_CHILD_LOGS:True})
+            return _decorator(args[0], {Options.SUPPRESS_CHILD_LOGS: True})
         return super(step, cls).__new__(cls)
 
     def __init__(self, *args, **kwargs):
@@ -121,6 +121,10 @@ class action(step):
 def debug(msg, **kwargs):
     kwargs.update({Options.DEBUG_MESSAGE: True})
     message(msg, **kwargs)
+
+
+def attach(msg, contents, *args, **kwargs):
+    message(msg, attach=dict(contents=contents, args=args, kwargs=kwargs))
 
 
 def message(msg, **kwargs):

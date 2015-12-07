@@ -4,6 +4,7 @@ from htmlentitydefs import name2codepoint
 __all__ = ["self_text", "inner_text"]
 
 
+# noinspection PyAbstractClass
 class ParseText(HTMLParser):
     wrap_start = ['blockquote', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'p', 'br', 'li', 'dd', 'dt']
     wrap_end = ['blockquote', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'p', 'ul', 'ol', 'dl']

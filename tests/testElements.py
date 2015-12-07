@@ -1,11 +1,11 @@
 import unittest
 
+from core.pypo4sel.core.common import BasePageElement, PageElementsContainer, FindOverride
+from core.pypo4sel.core.common import build_locator
 from mock import patch, Mock
 from selenium.common.exceptions import InvalidSelectorException, NoSuchElementException
 from selenium.webdriver.common.by import By
 
-from pypo4sel.core.common import BasePageElement, PageElementsContainer, FindOverride
-from pypo4sel.core.common import build_locator
 from pypo4sel.core.elements import PageElement, PageElementsList
 from pypo4sel.core.elements import WebElement
 

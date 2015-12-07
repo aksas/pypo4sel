@@ -1,7 +1,8 @@
 import unittest
-import nose
 
-from pypo4sel.core import log2l
+import nose
+from core.pypo4sel.core import log2l
+
 
 # log2l.message("init module")
 #

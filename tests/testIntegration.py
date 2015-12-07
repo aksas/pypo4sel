@@ -1,10 +1,10 @@
 from collections import Sequence
 
 import pytest
+from core.pypo4sel.core.webdrivers import FirefoxDriver
 from selenium.common.exceptions import NoSuchElementException
 
 from pypo4sel.core.common import BasePageElement
-from pypo4sel.core.webdrivers import FirefoxDriver
 
 """
 cases:

@@ -124,6 +124,7 @@ class AllureLogger(object):
         self.impl.stack.append(test)
 
     def _store_context(self):
+        # TODO and handling for parent suit level documentation
         if self.impl.testsuite and self.impl.testsuite.tests:
             self.impl.stop_suite()
         if len(self.suits) > 1:

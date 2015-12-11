@@ -1,5 +1,5 @@
 # pypo4sel
-Simple page object framework for selenium and python
+Simple page object framework for selenium for python
 
 ```python
 

@@ -10,8 +10,7 @@ from selenium.webdriver.remote.webelement import WebElement
 
 import common
 import log2l
-from pypo4sel.core.waiter import wait_displayed
-from waiter import wait
+from .waiter import wait_displayed, wait
 
 
 def need_interaction(func):
@@ -120,12 +119,10 @@ class PageElement(common.BasePageElement, common.PageElementsContainer, common.F
         return self._id
 
     @log2l.step
-    @need_interaction
     def send_keys(self, *value):
         super(PageElement, self).send_keys(*value)
 
     @log2l.step
-    @need_interaction
     def submit(self):
         super(PageElement, self).submit()
 
@@ -160,8 +157,10 @@ class PageElement(common.BasePageElement, common.PageElementsContainer, common.F
         while True:
             try:
                 if self._wait_ready_for_interaction:
+                    self._wait_ready_for_interaction = False
                     if not wait_displayed(self):
-                        raise ElementNotVisibleException()
+                        raise ElementNotVisibleException("Element with selector {}".format(self._locator))
+                    self._wait_ready_for_interaction = True
                 val = super(PageElement, self)._execute(command, params)
                 return val
             except StaleElementReferenceException:

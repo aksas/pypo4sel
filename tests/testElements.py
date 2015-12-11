@@ -1,13 +1,12 @@
 import unittest
 
-from core.pypo4sel.core.common import BasePageElement, PageElementsContainer, FindOverride
-from core.pypo4sel.core.common import build_locator
-from mock import patch, Mock
+from mock import Mock, patch
 from selenium.common.exceptions import InvalidSelectorException, NoSuchElementException
 from selenium.webdriver.common.by import By
 
-from pypo4sel.core.elements import PageElement, PageElementsList
-from pypo4sel.core.elements import WebElement
+from pypo4sel import PageElementsContainer
+from pypo4sel.core.common import build_locator, FindOverride, BasePageElement
+from pypo4sel.core.elements import WebElement, PageElement, PageElementsList
 
 
 class TestBuildLocator(unittest.TestCase):
@@ -223,12 +222,12 @@ class TestPageElement(unittest.TestCase):
     @patch.object(WebElement, "is_displayed")
     def test_is_displayed_calls_native_is_displayed(self, mock):
         self.sut.is_displayed()
-        mock.assert_called_once()
+        mock.assert_called_once_with()
 
     @patch.object(PageElement, "_execute")
     def test_is_displayed_calls_execute(self, mock):
         self.sut.is_displayed()
-        mock.assert_called_once()
+        mock.assert_called_once_with('isElementDisplayed')
 
     @patch.object(PageElement, "_execute")
     def test_is_displayed_return_false_if_there_are_no_element(self, mock):

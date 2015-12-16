@@ -19,7 +19,7 @@ variables: ``run_config.environment``, ``run_config.browser`` and ``run_config.r
 Example config structure (which uses an environment variable ``$PATH``).
 
 .. code-block:: python
-    config = {
+    config =
         {
             'default': {
                 'path':"{{PATH}}",
@@ -35,7 +35,7 @@ Example config structure (which uses an environment variable ``$PATH``).
                 'browser': {{browsers.chrome}}
             }
         }
-    }
+
 
 When accessing config, due to the default:
 * ``config['path']`` will always return the value of the environment

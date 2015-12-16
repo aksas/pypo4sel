@@ -1,3 +1,4 @@
+from .core import log2l
 from .core import waiter
 from .core.action_chains import ActionChains
 from .core.common import PageElementsContainer

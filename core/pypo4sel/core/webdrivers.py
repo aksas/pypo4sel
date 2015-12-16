@@ -4,8 +4,11 @@ import inspect
 from selenium import webdriver
 
 import common
+import log2l
 
 
+# TODO overwrite SwitchTo
+# TODO move step text to resources
 class WebDriverBase(common.FindOverride):
     implicitly_wait_timeout = 0
     script_wait_timeout = 0
@@ -35,6 +38,26 @@ class WebDriverBase(common.FindOverride):
     @property
     def driver(self):
         return self
+
+    @log2l.step
+    def get(self, url):
+        # noinspection PyUnresolvedReferences
+        super(WebDriverBase, self).get(url)
+
+    @log2l.step('Navigate one step backward in the browser history.')
+    def back(self):
+        # noinspection PyUnresolvedReferences
+        super(WebDriverBase, self).back()
+
+    @log2l.step('Navigate one step forward in the browser history.')
+    def forward(self):
+        # noinspection PyUnresolvedReferences
+        super(WebDriverBase, self).forward()
+
+    @log2l.step('Refresh the current page.')
+    def refresh(self):
+        # noinspection PyUnresolvedReferences
+        super(WebDriverBase, self).refresh()
 
     def __hash__(self):
         # noinspection PyUnresolvedReferences

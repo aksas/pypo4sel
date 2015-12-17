@@ -52,7 +52,7 @@ __All__ = ["step", "listeners", "message", "action", "debug"]
 
 
 class Options(object):
-    FIRST_PARAM = "first_param"
+    STEP_MESSAGE = "first_param"
     STEP_NAME = "step_name"
     ELEMENT_NAME = "element_name"
     KWARGS = "kwargs"
@@ -65,10 +65,10 @@ class ListenerMixin(object):
     def start_step(self, step_id, **options):
         pass
 
-    def end_step(self, step_id):
+    def end_step(self, step_id, **options):
         pass
 
-    def exception(self, step_id, exc_type, exc_val, exc_tb):
+    def exception(self, step_id, err, **options):
         pass
 
     def message(self, msg, **kwargs):
@@ -91,28 +91,28 @@ class step(object):
             raise Exception("Only one unnamed parameter is allowed.")
         self.options = kwargs
         if len(args) == 1:
-            self.options[Options.FIRST_PARAM] = args[0]
+            self.options[Options.STEP_MESSAGE] = args[0]
 
     def __call__(self, method):
         return _decorator(method, self.options)
 
     def __enter__(self):
-        assert "first_param" in self.options
-        self.options.setdefault(Options.STEP_NAME, self.options[Options.FIRST_PARAM])
-        self.options.setdefault(Options.ELEMENT_NAME, None)
-        self.options.setdefault(Options.KWARGS, None)
-        self.options.setdefault(Options.ARGS, None)
-
+        assert Options.STEP_MESSAGE in self.options
         self.step_id = _notify_start(**self.options)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is not None:
-            _notify_exception(self.step_id, exc_type, exc_val, exc_tb)
+            _notify_exception(self.step_id, (exc_type, exc_val, exc_tb))
         _notify_end(self.step_id)
 
 
 # noinspection PyPep8Naming
 class action(step):
+    def __new__(cls, *args, **kwargs):
+        if len(args) == 1 and callable(args[0]):
+            return _decorator(args[0], {Options.SUPPRESS_CHILD_LOGS: True})
+        return super(step, cls).__new__(cls)
+
     def __init__(self, *args, **kwargs):
         super(action, self).__init__(*args, **kwargs)
         self.options[Options.SUPPRESS_CHILD_LOGS] = True
@@ -123,29 +123,31 @@ def debug(msg, **kwargs):
     message(msg, **kwargs)
 
 
+def attach(msg, contents, *args, **kwargs):
+    message(msg, attach=dict(contents=contents, args=args, kwargs=kwargs))
+
+
 def message(msg, **kwargs):
     [l.message(msg, **kwargs) for l in listeners]
 
 
 def _decorator(method, step_options):
-    step_options.setdefault("step_name", method.func_name)
+    step_options.setdefault(Options.STEP_NAME, method.func_name)
 
     @functools.wraps(method)
     def wrapper(*args, **kwargs):
+        options = step_options.copy()
         fargs = args
-        if len(args) > 0:
-            if hasattr(args[0], "_name"):
-                # noinspection PyProtectedMember
-                step_options.setdefault("element_name", args[0]._name)
-                args = args[1:]
-        step_options.setdefault("element_name", None)
-        step_options.setdefault("kwargs", kwargs)
-        step_options.setdefault("args", args)
-        step_id = _notify_start(**step_options)
+        if len(args) > 0 and hasattr(args[0], "_name"):
+            # noinspection PyProtectedMember
+            options.setdefault(Options.ELEMENT_NAME, args[0]._name)
+        options.setdefault(Options.KWARGS, kwargs)
+        options.setdefault(Options.ARGS, args)
+        step_id = _notify_start(**options)
         try:
             return method(*fargs, **kwargs)
         except Exception:
-            _notify_exception(step_id, *sys.exc_info())
+            _notify_exception(step_id, sys.exc_info())
             raise
         finally:
             _notify_end(step_id)
@@ -159,9 +161,9 @@ def _notify_start(**options):
     return step_id
 
 
-def _notify_end(step_id):
-    [l.end_step(step_id) for l in listeners]
+def _notify_end(step_id, **options):
+    [l.end_step(step_id, **options) for l in listeners]
 
 
-def _notify_exception(step_id, exc_type, exc_val, exc_tb):
-    [l.exception(step_id, exc_type, exc_val, exc_tb) for l in listeners]
+def _notify_exception(step_id, err, **options):
+    [l.exception(step_id, err, **options) for l in listeners]

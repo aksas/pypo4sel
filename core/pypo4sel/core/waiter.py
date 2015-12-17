@@ -77,6 +77,7 @@ def wait_displayed(element, timeout=None, fail_on_timeout=None):
     If timeout is not specified or 0, then uses specific element wait timeout.
     :param element:
     :param timeout:
+    :param fail_on_timeout:
     :return:
     """
     return wait(lambda: element.is_displayed(), timeout or element.wait_timeout, fail_on_timeout)
@@ -89,6 +90,7 @@ def wait_not_displayed(element, timeout=None, fail_on_timeout=None):
     If timeout is not specified or 0, then uses specific element wait timeout.
     :param element:
     :param timeout:
+    :param fail_on_timeout:
     :return:
     """
     return wait(lambda: not element.is_displayed(), timeout or element.wait_timeout, fail_on_timeout)

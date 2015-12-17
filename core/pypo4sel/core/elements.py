@@ -1,14 +1,29 @@
+import functools
 import hashlib
+import re
 import time
 import uuid
-import collections
 
+from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException, \
+    ElementNotVisibleException
 from selenium.webdriver.remote.webelement import WebElement
-from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
 
 import common
 import log2l
-from waiter import wait
+from .waiter import wait_displayed, wait
+
+
+def need_interaction(func):
+    @functools.wraps(func)
+    def wrap(*args, **kwargs):
+        el = args[0]
+        el._wait_ready_for_interaction = True
+        try:
+            return func(*args, **kwargs)
+        finally:
+            el._wait_ready_for_interaction = False
+
+    return wrap
 
 
 class PageElement(common.BasePageElement, common.PageElementsContainer, common.FindOverride, WebElement):
@@ -21,13 +36,13 @@ class PageElement(common.BasePageElement, common.PageElementsContainer, common.F
     Class instance may be used as a part of page object/page block
     or class type may be specified directly as last parameter of find/child_element(s) to wrap found element(s).
 
-    For page object filed may be specified __set__ method for more useful interaction with the element.
+    For page object field may be specified __set__ method for more useful interaction with the element.
     In this case ``_fill_owner`` should be called first in the __set__ method.
 
     Examples:
 
     class SomePageBlock(PageElement):
-        filed = PageElement("#filed_id")
+        field = PageElement("#field_id")
         element = PageElement("#element_id")
 
         def do_some_work(self, keys):
@@ -61,16 +76,11 @@ class PageElement(common.BasePageElement, common.PageElementsContainer, common.F
         self._parent = None
         self._id = None
         self.__cache = {}
+        self._wait_ready_for_interaction = False
 
-    def reload(self):
-        # noinspection PyUnresolvedReferences
-        # noinspection PySuperArguments
-        we = wait(common.find, self.wait_timeout, owner=self._owner, locator=self._locator)
-        if not we:
-            raise NoSuchElementException("Element with selector {} was not found".format(self._locator))
-        self._id = we.id
-        self._parent = we.parent
-        self.__cache[self._owner] = self._id
+    def has_class(self, class_name):
+        cls_attr = self.get_attribute('class')
+        return False if cls_attr is None else re.search(r'(^|\s){}(\s|$)'.format(class_name), cls_attr) is not None
 
     def exists(self):
         """
@@ -118,12 +128,22 @@ class PageElement(common.BasePageElement, common.PageElementsContainer, common.F
         super(PageElement, self).submit()
 
     @log2l.step
+    @need_interaction
     def click(self):
         super(PageElement, self).click()
 
     @log2l.step
+    @need_interaction
     def clear(self):
         super(PageElement, self).clear()
+
+    def reload(self):
+        we = wait(common.find, self.wait_timeout, owner=self._owner, locator=self._locator)
+        if not we:
+            raise NoSuchElementException("Element with selector {} was not found".format(self._locator))
+        self._id = we.id
+        self._parent = we.parent
+        self.__cache[self._owner] = self._id
 
     def _fill_owner(self, owner):
         super(PageElement, self)._fill_owner(owner)
@@ -134,21 +154,26 @@ class PageElement(common.BasePageElement, common.PageElementsContainer, common.F
         if not self.__cached__ or self._id is None:
             self.reload()
 
-        stale_reference_occurrence = 0
+        execute_attempts = 0
         while True:
             try:
+                if self._wait_ready_for_interaction:
+                    self._wait_ready_for_interaction = False
+                    if not wait_displayed(self):
+                        raise ElementNotVisibleException("Element with selector {}".format(self._locator))
+                    self._wait_ready_for_interaction = True
                 val = super(PageElement, self)._execute(command, params)
                 return val
             except StaleElementReferenceException:
-                if stale_reference_occurrence > common.WAIT_STALE_ELEMENT_MAX_TRY:
+                if execute_attempts > common.WAIT_STALE_ELEMENT_MAX_TRY:
                     raise
                 time.sleep(common.WAIT_ELEMENT_POLL_FREQUENCY)
                 self.reload()
-                stale_reference_occurrence += 1
+            execute_attempts += 1
         return None
 
     def __hash__(self):
-        return int(hashlib.md5(self.id.encode('utf-8')).hexdigest(), 16)
+        return int(hashlib.md5(self.id).hexdigest(), 16)
 
 
 class _ListItem(object):
@@ -180,8 +205,7 @@ class _ListItem(object):
         self._container.wait_timeout = t
 
 
-# noinspection PyAbstractClass
-class PageElementsList(common.BasePageElement, collections.Sequence):
+class PageElementsList(common.BasePageElement):
     """
     Provide list interface for list of page elements.
     The list encapsulate logic of changing of context of elements usage and hold context of element usage.
@@ -213,11 +237,24 @@ class PageElementsList(common.BasePageElement, collections.Sequence):
         self.__cache = {}
         self.__items = []
 
+    def is_displayed(self):
+        """
+        :return: True id at least one element is displayed, otherwise False.
+                Ignore implicit and element timeouts and execute immediately.
+        """
+        t = self.wait_timeout
+        self.wait_timeout = 0
+        try:
+            self.reload()
+            return any(e.is_displayed() for e in self)
+        finally:
+            self.wait_timeout = t
+
     def reload(self):
         # noinspection PyUnresolvedReferences
         # noinspection PySuperArguments
         l = wait(lambda: super(common.FindOverride, self._owner).find_elements(*self._locator), self.wait_timeout)
-        cache = [(w.id, w.parent) for w in l]
+        cache = [w.id for w in l]
         self.__initialize_elements(cache)
         self.__cache[self._owner] = cache
 
@@ -229,7 +266,8 @@ class PageElementsList(common.BasePageElement, collections.Sequence):
         else:
             del self.__items[new_len:]
         for e, l in zip(self.__items, items):
-            setattr(e, "_id", l[0]), setattr(e, "_parent", l[1]), setattr(e, "_w3c", self._w3c)
+            setattr(e, "_id", l), setattr(e, "_parent", self._parent)
+            setattr(e, "_w3c", self._w3c), setattr(e, "_owner", self._owner)
 
     def _fill_owner(self, owner):
         super(PageElementsList, self)._fill_owner(owner)
@@ -243,20 +281,21 @@ class PageElementsList(common.BasePageElement, collections.Sequence):
     def __getitem__(self, index):
         if not self.__cached__ or self._owner not in self.__cache:
             self.reload()
-        return self.__items[index]
-
-    def is_displayed(self):
-        """
-        :return: True id at least one element is displayed, otherwise False.
-                Ignore implicit and element timeouts and execute immediately.
-        """
-        t = self.wait_timeout
-        self.wait_timeout = 0
         try:
+            return self.__items[index]
+        except IndexError:
             self.reload()
-            return any(e.is_displayed() for e in self)
-        finally:
-            self.wait_timeout = t
+            return self.__items[index]
+
+    def __iter__(self):
+        self.reload()
+        i = 0
+        while True:
+            try:
+                yield self[i]
+                i += 1
+            except IndexError:
+                return
 
 
 class VirtualElement(common.BasePageElement, common.PageElementsContainer, common.FindOverride):

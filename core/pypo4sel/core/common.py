@@ -1,11 +1,10 @@
-from abc import abstractmethod
 import inspect
-from operator import add
 import re
+from abc import abstractmethod
 
+import six
 from selenium.common.exceptions import InvalidSelectorException, NoSuchElementException
 from selenium.webdriver.common.by import By
-import six
 
 WAIT_STALE_ELEMENT_MAX_TRY = 5
 WAIT_ELEMENT_TIMEOUT = 0
@@ -15,7 +14,7 @@ WAIT_ELEMENT_POLL_FREQUENCY = 0.5
 def get_members_safety(cls):
     # inspect.getmembers calls __get__ method of the field, if exists, that may cause unexpected actions
     # the solution below does't have this problem
-    return reduce(add, [vars(c).items() for c in inspect.getmro(cls)])
+    return reduce(lambda a, b: dict(a, **vars(b)), reversed(inspect.getmro(cls)), {}).items()
 
 
 class PageElementsContainer(object):
@@ -26,17 +25,18 @@ class PageElementsContainer(object):
     than it should have attribute 'driver' with web driver instance.
     """
 
-    def __new__(cls, *more):
+    def __new__(cls, *args, **kwargs):
         for k, v in get_members_safety(cls):
             if isinstance(v, (BasePageElement,)) and v._name is None:
                 v._name = k
-        return super(PageElementsContainer, cls).__new__(cls, *more)
+        # noinspection PyArgumentList
+        return super(PageElementsContainer, cls).__new__(cls, *args, **kwargs)
 
     def all_elements(self):
         """returns all public BasePageElements grouped by this element and it parent(s)
         :rtype: list[(str, BasePageElement)]
         """
-        return [(k, v) for k, v in get_members_safety(self)
+        return [(k, getattr(self, k)) for k, v in get_members_safety(self.__class__)
                 if not k.startswith("_") and isinstance(v, (BasePageElement,))]
 
 
@@ -53,6 +53,7 @@ class BasePageElement(object):
         self._parent = None
         """ :type: FindOverride """
         self.__timeout = timeout
+        self._w3c = False
 
     def _fill_owner(self, owner):
         # _parent and _id field are native for Selenium WebDriver WebElement
@@ -133,7 +134,7 @@ class FindOverride(object):
         :param value:
         :type el_class: T <= PageElement
         :param el_class:
-        :rtype: T | PageElement
+        :rtype: T <= PageElement
         :return:
         """
         el, selector = define_selector(by, value, el_class)
@@ -147,7 +148,8 @@ class FindOverride(object):
         :param el_class:
         :return:
         """
-        return self.find_elements(by, value, el_class)
+        el, selector = define_selector(by, value, el_class)
+        return self._init_element(elements.PageElementsList(selector, el))
 
     def find_element(self, by=By.ID, value=None, el_class=None):
         """
@@ -165,7 +167,7 @@ class FindOverride(object):
         :param value:
         :type el_class: T <= PageElement
         :param el_class:
-        :rtype: T | PageElement
+        :rtype: T <= PageElement
         :return:
         """
         el = self.child_element(by, value, el_class)
@@ -191,8 +193,9 @@ class FindOverride(object):
         :rtype: PageElementsList[T | ListElement]
         :return:
         """
-        el, selector = define_selector(by, value, el_class)
-        return self._init_element(elements.PageElementsList(selector, el))
+        els = self.child_elements(by, value, el_class)
+        els.reload()
+        return els
 
     def _init_element(self, element):
         # noinspection PyProtectedMember

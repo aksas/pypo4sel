@@ -35,7 +35,7 @@ Wrapper for selenium webdriver to make page objects easy::
 
 setup(
     name='pypo4sel.core',
-    version='0.0.1',
+    version='0.0.2',
     packages=['pypo4sel', 'pypo4sel.core'],
     url='https://github.com/aksas/pypo4sel',
     license='MIT',

@@ -7,7 +7,6 @@ import common
 import log2l
 
 
-# TODO overwrite SwitchTo
 # TODO move step text to resources
 class WebDriverBase(common.FindOverride):
     implicitly_wait_timeout = 0
